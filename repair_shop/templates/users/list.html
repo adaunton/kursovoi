@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Управление пользователями — МастерСервис{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Пользователи системы</h2>
+    <a href="{{ url_for('action_logs') }}" class="btn btn-outline-secondary">
+        <i class="bi bi-journal-text me-1"></i>Журнал действий (ActionLog)
+    </a>
+</div>
+
+<!-- Форма поиска (GET) -->
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('users_list') }}" class="row g-2 align-items-end">
+            <div class="col-md-10">
+                <label class="form-label small text-muted">Поиск по логину (username) или ФИО</label>
+                <input type="text" name="search" class="form-control form-control-sm" value="{{ request.args.get('search', '') }}" placeholder="Введите логин или фамилию...">
+            </div>
+            <div class="col-md-2 d-grid">
+                <button type="submit" class="btn btn-sm btn-dark">Найти</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Таблица пользователей -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Логин</th>
+                        <th>Пароль (откр.)</th>
+                        <th>ФИО</th>
+                        <th>Телефон / Email</th>
+                        <th>Роль</th>
+                        <th>Статус</th>
+                        <th class="text-end">Управление</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users %}
+                    <tr>
+                        <td>#{{ u.id }}</td>
+                        <td><strong>{{ u.username }}</strong></td>
+                        <td><code>{{ u.password }}</code></td>
+                        <td>{{ u.full_name }}</td>
+                        <td>
+                            {{ u.phone }}<br>
+                            <small class="text-muted">{{ u.email or '' }}</small>
+                        </td>
+                        <td>
+                            <form method="POST" action="{{ url_for('users_change_role', user_id=u.id) }}" class="d-flex gap-1 align-items-center">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <select name="role" class="form-select form-select-sm" style="width: 120px;">
+                                    <option value="client" {% if u.role == 'client' %}selected{% endif %}>client</option>
+                                    <option value="master" {% if u.role == 'master' %}selected{% endif %}>master</option>
+                                    <option value="admin" {% if u.role == 'admin' %}selected{% endif %}>admin</option>
+                                </select>
+                                <button type="submit" class="btn btn-sm btn-outline-primary">ОК</button>
+                            </form>
+                        </td>
+                        <td>
+                            {% if u.is_blocked %}
+                                <span class="badge bg-danger">Заблокирован</span>
+                            {% else %}
+                                <span class="badge bg-success">Активен</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end text-nowrap">
+                            {% if u.id != current_user.id %}
+                            <form method="POST" action="{{ url_for('users_toggle_block', user_id=u.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <button type="submit" class="btn btn-sm {% if u.is_blocked %}btn-outline-success{% else %}btn-outline-warning text-dark{% endif %}">
+                                    {% if u.is_blocked %}Разблокировать{% else %}Блокировать{% endif %}
+                                </button>
+                            </form>
+                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#delUserModal{{ u.id }}">
+                                Удалить
+                            </button>
+                            {% else %}
+                            <span class="text-muted small">Это вы</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    {% if u.id != current_user.id %}
+                    <div class="modal fade" id="delUserModal{{ u.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Подтверждение удаления</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                                </div>
+                                <div class="modal-body">
+                                    Вы уверены, что хотите удалить пользователя <strong>{{ u.full_name }} ({{ u.username }})</strong>?
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                    <form method="POST" action="{{ url_for('users_delete', user_id=u.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-danger">Удалить</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Пагинация -->
+{% if pagination.pages > 1 %}
+<nav class="mt-4">
+    <ul class="pagination justify-content-center">
+        <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('users_list', page=pagination.prev_num, search=request.args.get('search')) }}">&larr; Назад</a>
+        </li>
+        {% for p in pagination.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
+            {% if p %}
+                <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('users_list', page=p, search=request.args.get('search')) }}">{{ p }}</a>
+                </li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+            {% endif %}
+        {% endfor %}
+        <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('users_list', page=pagination.next_num, search=request.args.get('search')) }}">Вперёд &rarr;</a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

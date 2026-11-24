@@ -1,0 +1,6 @@
+{
+  "name": "МастерСервис — Учёт заказов и склада (Flask)",
+  "description": "Учебный курсовой проект на Python Flask + PostgreSQL: система управления заказами ремонтной мастерской и складом запчастей с живым демо и полным исходным кодом.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Мой профиль — МастерСервис{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Личный кабинет пользователя</h2>
+
+<div class="row g-4">
+    <!-- Редактирование ФИО, телефона и email -->
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-light fw-bold">
+                Личные данные ({{ current_user.username }})
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('profile') }}" novalidate>
+                    {{ profile_form.hidden_tag() }}
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted">Логин и роль</label>
+                        <input type="text" class="form-control" value="{{ current_user.username }} ({{ current_user.role }})" disabled>
+                    </div>
+
+                    <div class="mb-3">
+                        {{ profile_form.full_name.label(class="form-label") }}
+                        {{ profile_form.full_name(class="form-control" + (" is-invalid" if profile_form.full_name.errors else "")) }}
+                        {% for err in profile_form.full_name.errors %}
+                            <div class="invalid-feedback">{{ err }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ profile_form.phone.label(class="form-label") }}
+                        {{ profile_form.phone(class="form-control" + (" is-invalid" if profile_form.phone.errors else "")) }}
+                        {% for err in profile_form.phone.errors %}
+                            <div class="invalid-feedback">{{ err }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ profile_form.email.label(class="form-label") }}
+                        {{ profile_form.email(class="form-control" + (" is-invalid" if profile_form.email.errors else "")) }}
+                        {% for err in profile_form.email.errors %}
+                            <div class="invalid-feedback">{{ err }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <button type="submit" name="submit_profile" class="btn btn-primary">
+                        Сохранить изменения
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Смена собственного пароля -->
+    <div class="col-md-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-light fw-bold">
+                Смена пароля
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('profile_password') }}" novalidate>
+                    {{ password_form.hidden_tag() }}
+
+                    <div class="mb-3">
+                        {{ password_form.old_password.label(class="form-label") }}
+                        {{ password_form.old_password(class="form-control" + (" is-invalid" if password_form.old_password.errors else "")) }}
+                        {% for err in password_form.old_password.errors %}
+                            <div class="invalid-feedback">{{ err }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ password_form.new_password.label(class="form-label") }}
+                        {{ password_form.new_password(class="form-control" + (" is-invalid" if password_form.new_password.errors else "")) }}
+                        {% for err in password_form.new_password.errors %}
+                            <div class="invalid-feedback">{{ err }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ password_form.confirm_password.label(class="form-label") }}
+                        {{ password_form.confirm_password(class="form-control" + (" is-invalid" if password_form.confirm_password.errors else "")) }}
+                        {% for err in password_form.confirm_password.errors %}
+                            <div class="invalid-feedback">{{ err }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <button type="submit" class="btn btn-warning">
+                        Обновить пароль
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

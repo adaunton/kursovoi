@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}Заявки на закупку — МастерСервис{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Заявки на закупку запчастей</h2>
+    <div class="d-flex gap-2">
+        {% if current_user.role == 'admin' %}
+        <a href="{{ url_for('suppliers_create') }}" class="btn btn-outline-secondary">
+            <i class="bi bi-building-add me-1"></i>Добавить поставщика
+        </a>
+        {% endif %}
+        <a href="{{ url_for('purchase_requests_create') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Создать заявку
+        </a>
+    </div>
+</div>
+
+<!-- Фильтр по статусу заявки (GET) -->
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('purchase_requests_list') }}" class="row g-2 align-items-end">
+            <div class="col-md-4">
+                <label class="form-label small text-muted">Статус заявки</label>
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">Все статусы</option>
+                    <option value="new" {% if request.args.get('status') == 'new' %}selected{% endif %}>Новая (new)</option>
+                    <option value="approved" {% if request.args.get('status') == 'approved' %}selected{% endif %}>Одобрена (approved)</option>
+                    <option value="received" {% if request.args.get('status') == 'received' %}selected{% endif %}>Получена (received)</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-grid">
+                <button type="submit" class="btn btn-sm btn-dark">Применить фильтр</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Таблица заявок на закупку -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Запчасть</th>
+                        <th>Поставщик</th>
+                        <th>Кол-во</th>
+                        <th>Цена за шт.</th>
+                        <th>Сумма</th>
+                        <th>Статус</th>
+                        <th>Создал</th>
+                        <th>Дата</th>
+                        {% if current_user.role == 'admin' %}
+                        <th class="text-end">Действия (Админ)</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for r in requests %}
+                    <tr>
+                        <td><strong>#{{ r.id }}</strong></td>
+                        <td>
+                            <div class="fw-semibold">{{ r.part.name if r.part else '—' }}</div>
+                            <small class="text-muted">Арт: {{ r.part.article if r.part else '' }}</small>
+                        </td>
+                        <td>
+                            {{ r.supplier.name if r.supplier else '—' }}
+                            {% if current_user.role == 'admin' and r.supplier %}
+                            <div class="mt-1">
+                                <a href="{{ url_for('suppliers_edit', supplier_id=r.supplier.id) }}" class="text-decoration-none small text-secondary me-2">Редактировать поставщика</a>
+                            </div>
+                            {% endif %}
+                        </td>
+                        <td>{{ r.quantity }} шт.</td>
+                        <td>{{ "%.2f"|format(r.price) }} ₽</td>
+                        <td class="fw-bold">{{ "%.2f"|format((r.price or 0) * r.quantity) }} ₽</td>
+                        <td>
+                            {% if r.status == 'new' %}
+                                <span class="badge bg-secondary">Новая</span>
+                            {% elif r.status == 'approved' %}
+                                <span class="badge bg-primary">Одобрена</span>
+                            {% elif r.status == 'received' %}
+                                <span class="badge bg-success">Получена (на складе)</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ r.creator.full_name if r.creator else '—' }}</td>
+                        <td>{{ r.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+
+                        {% if current_user.role == 'admin' %}
+                        <td class="text-end text-nowrap">
+                            {% if r.status == 'new' %}
+                            <form method="POST" action="{{ url_for('purchase_requests_status', req_id=r.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="status" value="approved">
+                                <button type="submit" class="btn btn-sm btn-primary">Одобрить</button>
+                            </form>
+                            {% endif %}
+
+                            {% if r.status in ['new', 'approved'] %}
+                            <form method="POST" action="{{ url_for('purchase_requests_status', req_id=r.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                <input type="hidden" name="status" value="received">
+                                <button type="submit" class="btn btn-sm btn-success">Получено (+склад)</button>
+                            </form>
+                            <a href="{{ url_for('purchase_requests_edit', req_id=r.id) }}" class="btn btn-sm btn-outline-secondary">Изменить</a>
+                            {% endif %}
+
+                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#delReqModal{{ r.id }}">
+                                Удалить
+                            </button>
+                        </td>
+                        {% endif %}
+                    </tr>
+
+                    {% if current_user.role == 'admin' %}
+                    <div class="modal fade" id="delReqModal{{ r.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Подтверждение удаления</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                                </div>
+                                <div class="modal-body">
+                                    Вы уверены, что хотите удалить заявку на закупку <strong>#{{ r.id }}</strong>?
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                    <form method="POST" action="{{ url_for('purchase_requests_delete', req_id=r.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-danger">Удалить</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <tr>
+                        <td colspan="10" class="text-center text-muted py-4">Заявок на закупку не найдено.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Пагинация -->
+{% if pagination.pages > 1 %}
+<nav class="mt-4">
+    <ul class="pagination justify-content-center">
+        <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('purchase_requests_list', page=pagination.prev_num, status=request.args.get('status')) }}">&larr; Назад</a>
+        </li>
+        {% for p in pagination.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
+            {% if p %}
+                <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('purchase_requests_list', page=p, status=request.args.get('status')) }}">{{ p }}</a>
+                </li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+            {% endif %}
+        {% endfor %}
+        <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('purchase_requests_list', page=pagination.next_num, status=request.args.get('status')) }}">Вперёд &rarr;</a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

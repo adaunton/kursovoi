@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}Склад запчастей — МастерСервис{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Склад запчастей</h2>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('purchase_requests_create') }}" class="btn btn-outline-warning text-dark">
+            <i class="bi bi-cart-plus me-1"></i>Создать заявку на закупку
+        </a>
+        {% if current_user.role == 'admin' %}
+        <a href="{{ url_for('parts_categories') }}" class="btn btn-outline-secondary">
+            Категории запчастей
+        </a>
+        <a href="{{ url_for('parts_create') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Добавить запчасть
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Форма поиска и фильтра по категории (GET) -->
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('parts_list') }}" class="row g-2 align-items-end">
+            <div class="col-md-6">
+                <label class="form-label small text-muted">Поиск по наименованию или артикулу</label>
+                <input type="text" name="search" class="form-control form-control-sm" value="{{ request.args.get('search', '') }}" placeholder="Введите название или код артикула...">
+            </div>
+            <div class="col-md-4">
+                <label class="form-label small text-muted">Категория</label>
+                <select name="category" class="form-select form-select-sm">
+                    <option value="">Все категории</option>
+                    {% for cat in categories %}
+                    <option value="{{ cat.id }}" {% if request.args.get('category') == cat.id|string %}selected{% endif %}>{{ cat.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2 d-grid">
+                <button type="submit" class="btn btn-sm btn-dark">Применить</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Таблица запчастей -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>Артикул</th>
+                        <th>Наименование</th>
+                        <th>Категория</th>
+                        <th>Остаток</th>
+                        <th>Мин. норма</th>
+                        <th>Цена</th>
+                        <th class="text-end">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in parts %}
+                    <tr>
+                        <td><code>{{ p.article }}</code></td>
+                        <td class="fw-semibold">{{ p.name }}</td>
+                        <td>{{ p.category.name if p.category else '—' }}</td>
+                        <td>
+                            {% if p.quantity <= p.min_quantity %}
+                                <span class="badge bg-danger">{{ p.quantity }} шт. (Мало!)</span>
+                            {% else %}
+                                <span class="badge bg-success">{{ p.quantity }} шт.</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ p.min_quantity }} шт.</td>
+                        <td>{{ "%.2f"|format(p.price) }} ₽</td>
+                        <td class="text-end text-nowrap">
+                            {% if p.quantity <= p.min_quantity %}
+                            <a href="{{ url_for('purchase_requests_create', part_id=p.id) }}" class="btn btn-sm btn-warning">Заявка</a>
+                            {% endif %}
+                            <a href="{{ url_for('parts_history', part_id=p.id) }}" class="btn btn-sm btn-outline-info text-dark">История</a>
+                            {% if current_user.role == 'admin' %}
+                            <a href="{{ url_for('parts_edit', part_id=p.id) }}" class="btn btn-sm btn-outline-secondary">Изменить</a>
+                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deletePartModal{{ p.id }}">
+                                Удалить
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    {% if current_user.role == 'admin' %}
+                    <!-- Модальное окно удаления запчасти -->
+                    <div class="modal fade" id="deletePartModal{{ p.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Подтверждение удаления</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                                </div>
+                                <div class="modal-body">
+                                    Вы уверены, что хотите удалить запчасть <strong>«{{ p.name }}» ({{ p.article }})</strong>?
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                    <form method="POST" action="{{ url_for('parts_delete', part_id=p.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-danger">Удалить</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">Запчасти не найдены.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Пагинация -->
+{% if pagination.pages > 1 %}
+<nav class="mt-4">
+    <ul class="pagination justify-content-center">
+        <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('parts_list', page=pagination.prev_num, search=request.args.get('search'), category=request.args.get('category')) }}">&larr; Назад</a>
+        </li>
+        {% for p in pagination.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
+            {% if p %}
+                <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('parts_list', page=p, search=request.args.get('search'), category=request.args.get('category')) }}">{{ p }}</a>
+                </li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+            {% endif %}
+        {% endfor %}
+        <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('parts_list', page=pagination.next_num, search=request.args.get('search'), category=request.args.get('category')) }}">Вперёд &rarr;</a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

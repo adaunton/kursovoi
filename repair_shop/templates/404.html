@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{{ error_title or 'Страница не найдена (404)' }} — МастерСервис{% endblock %}
+
+{% block content %}
+<div class="text-center py-5">
+    <h1 class="display-1 fw-bold text-secondary">{{ error_code or 404 }}</h1>
+    <h3 class="mb-3">{{ error_title or 'Запрашиваемая страница не найдена' }}</h3>
+    <p class="text-muted mb-4">
+        Возможно, ссылка устарела, объект был удалён или у вашей учётной записи недостаточно прав доступа.
+    </p>
+    <a href="{{ url_for('dashboard') if current_user.is_authenticated else url_for('login') }}" class="btn btn-primary">
+        <i class="bi bi-house-door me-1"></i>На главную
+    </a>
+</div>
+{% endblock %}

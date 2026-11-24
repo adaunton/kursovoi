@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Поставщики — МастерСервис{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">Поставщики запчастей</h2>
+    {% if current_user.role == 'admin' %}
+    <a href="{{ url_for('suppliers_create') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Добавить поставщика
+    </a>
+    {% endif %}
+</div>
+
+<!-- Форма поиска (GET) -->
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('suppliers_list') }}" class="row g-2 align-items-end">
+            <div class="col-md-10">
+                <label class="form-label small text-muted">Поиск по названию компании или контактному лицу</label>
+                <input type="text" name="search" class="form-control form-control-sm" value="{{ request.args.get('search', '') }}" placeholder="Например: Ромашка или Иванов">
+            </div>
+            <div class="col-md-2 d-grid">
+                <button type="submit" class="btn btn-sm btn-dark">Найти</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Таблица поставщиков -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Название компании</th>
+                        <th>Контактное лицо</th>
+                        <th>Телефон</th>
+                        <th>Email</th>
+                        <th>Адрес</th>
+                        {% if current_user.role == 'admin' %}
+                        <th class="text-end">Действия</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in suppliers %}
+                    <tr>
+                        <td>#{{ s.id }}</td>
+                        <td class="fw-semibold">{{ s.name }}</td>
+                        <td>{{ s.contact_person }}</td>
+                        <td>{{ s.phone }}</td>
+                        <td>{{ s.email or '—' }}</td>
+                        <td>{{ s.address or '—' }}</td>
+                        {% if current_user.role == 'admin' %}
+                        <td class="text-end text-nowrap">
+                            <a href="{{ url_for('suppliers_edit', supplier_id=s.id) }}" class="btn btn-sm btn-outline-secondary">Редактировать</a>
+                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#delSupplierModal{{ s.id }}">
+                                Удалить
+                            </button>
+                        </td>
+                        {% endif %}
+                    </tr>
+
+                    {% if current_user.role == 'admin' %}
+                    <div class="modal fade" id="delSupplierModal{{ s.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Подтверждение удаления</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                                </div>
+                                <div class="modal-body">
+                                    Вы уверены, что хотите удалить поставщика <strong>«{{ s.name }}»</strong>?
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                    <form method="POST" action="{{ url_for('suppliers_delete', supplier_id=s.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-danger">Удалить</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted py-4">Поставщики не найдены.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Пагинация -->
+{% if pagination.pages > 1 %}
+<nav class="mt-4">
+    <ul class="pagination justify-content-center">
+        <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('suppliers_list', page=pagination.prev_num, search=request.args.get('search')) }}">&larr; Назад</a>
+        </li>
+        {% for p in pagination.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
+            {% if p %}
+                <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('suppliers_list', page=p, search=request.args.get('search')) }}">{{ p }}</a>
+                </li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+            {% endif %}
+        {% endfor %}
+        <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('suppliers_list', page=pagination.next_num, search=request.args.get('search')) }}">Вперёд &rarr;</a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

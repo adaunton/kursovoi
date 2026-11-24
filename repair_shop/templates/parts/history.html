@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}История движения: {{ part.name }} — МастерСервис{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+        <h2 class="mb-0">История движения: {{ part.name }}</h2>
+        <small class="text-muted">Артикул: <code>{{ part.article }}</code> | Текущий остаток: <strong>{{ part.quantity }} шт.</strong></small>
+    </div>
+    <a href="{{ url_for('parts_list') }}" class="btn btn-outline-secondary">&larr; Назад на склад</a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-striped mb-0">
+            <thead>
+                <tr>
+                    <th>Дата и время</th>
+                    <th>Тип операции</th>
+                    <th>Изменение</th>
+                    <th>Пользователь</th>
+                    <th>Основание / Комментарий</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in movements %}
+                <tr>
+                    <td>{{ m.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                    <td>
+                        {% if m.type == 'income' %}
+                            <span class="badge bg-success">Приход (income)</span>
+                        {% elif m.type == 'outcome' %}
+                            <span class="badge bg-danger">Расход (outcome)</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Корректировка</span>
+                        {% endif %}
+                    </td>
+                    <td class="fw-bold {% if m.quantity > 0 %}text-success{% else %}text-danger{% endif %}">
+                        {% if m.quantity > 0 %}+{{ m.quantity }}{% else %}{{ m.quantity }}{% endif %} шт.
+                    </td>
+                    <td>{{ m.user.full_name if m.user else 'Система' }}</td>
+                    <td>{{ m.comment or '—' }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="text-center text-muted py-4">Движений по данной запчасти пока не зафиксировано.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

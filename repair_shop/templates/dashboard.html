@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+{% block title %}Дашборд — МастерСервис{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-0">
+            {% if current_user.role == 'client' %}
+                Мои заказы — Панель клиента
+            {% elif current_user.role == 'master' %}
+                Рабочий стол мастера
+            {% else %}
+                Панель управления администратора
+            {% endif %}
+        </h2>
+        <small class="text-muted">Сводная статистика заказов и состояния склада</small>
+    </div>
+    <a href="{{ url_for('orders_create') }}" class="btn btn-primary">
+        <i class="bi bi-plus-lg me-1"></i>Новый заказ
+    </a>
+</div>
+
+<!-- Карточки заказов по статусам -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card border-secondary shadow-sm">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="text-muted small">Ожидание</div>
+                    <h3 class="mb-0 fw-bold">{{ status_counts.waiting }}</h3>
+                </div>
+                <span class="badge bg-secondary fs-6">waiting</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-warning shadow-sm">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="text-muted small">В работе</div>
+                    <h3 class="mb-0 fw-bold">{{ status_counts.in_work }}</h3>
+                </div>
+                <span class="badge bg-warning text-dark fs-6">in_work</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-info shadow-sm">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="text-muted small">Готов к выдаче</div>
+                    <h3 class="mb-0 fw-bold">{{ status_counts.ready }}</h3>
+                </div>
+                <span class="badge bg-info text-dark fs-6">ready</span>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card border-success shadow-sm">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="text-muted small">Выдан клиенту</div>
+                    <h3 class="mb-0 fw-bold">{{ status_counts.issued }}</h3>
+                </div>
+                <span class="badge bg-success fs-6">issued</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Дополнительная статистика для администратора -->
+{% if current_user.role == 'admin' %}
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card bg-light shadow-sm">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="text-muted small">Всего пользователей</div>
+                    <h4 class="mb-0">{{ admin_stats.users_count }}</h4>
+                </div>
+                <a href="{{ url_for('users_list') }}" class="btn btn-outline-dark btn-sm">Управление</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-light shadow-sm">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="text-muted small">Поставщиков в базе</div>
+                    <h4 class="mb-0">{{ admin_stats.suppliers_count }}</h4>
+                </div>
+                <a href="{{ url_for('suppliers_list') }}" class="btn btn-outline-dark btn-sm">Открыть</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card bg-light shadow-sm">
+            <div class="card-body d-flex justify-content-between align-items-center">
+                <div>
+                    <div class="text-muted small">Заявок на закупку в работе</div>
+                    <h4 class="mb-0">{{ admin_stats.active_requests_count }}</h4>
+                </div>
+                <a href="{{ url_for('purchase_requests_list') }}" class="btn btn-outline-dark btn-sm">Заявки</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Блок «Заканчивается на складе / Требуется закупка» для master и admin -->
+{% if current_user.role in ['admin', 'master'] %}
+<div class="card border-danger shadow-sm mb-4">
+    <div class="card-header bg-danger text-white d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-exclamation-triangle-fill me-2"></i><strong>Требуется закупка:</strong> заканчивается на складе (остаток &le; мин. остатка)</span>
+        <a href="{{ url_for('purchase_requests_create') }}" class="btn btn-light btn-sm">Все заявки</a>
+    </div>
+    <div class="card-body p-0">
+        {% if low_stock_parts %}
+        <div class="table-responsive">
+            <table class="table table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>Артикул</th>
+                        <th>Запчасть</th>
+                        <th>Категория</th>
+                        <th>Текущий остаток</th>
+                        <th>Мин. норма</th>
+                        <th>Цена</th>
+                        <th class="text-end">Действие</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for part in low_stock_parts %}
+                    <tr>
+                        <td><code>{{ part.article }}</code></td>
+                        <td>{{ part.name }}</td>
+                        <td>{{ part.category.name if part.category else '—' }}</td>
+                        <td><span class="badge bg-danger">{{ part.quantity }} шт.</span></td>
+                        <td>{{ part.min_quantity }} шт.</td>
+                        <td>{{ "%.2f"|format(part.price) }} ₽</td>
+                        <td class="text-end">
+                            <a href="{{ url_for('purchase_requests_create', part_id=part.id) }}" class="btn btn-sm btn-warning">
+                                <i class="bi bi-cart-plus me-1"></i>Создать заявку
+                            </a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="p-3 text-success">
+            <i class="bi bi-check-circle me-1"></i>Все запчасти на складе в достаточном количестве.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Графики Chart.js -->
+<div class="row g-4 mb-4">
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white fw-bold">Заказы по статусам</div>
+            <div class="card-body">
+                <canvas id="statusPieChart" height="220"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white fw-bold">Заказы по месяцам (6 мес.)</div>
+            <div class="card-body">
+                <canvas id="ordersBarChart" height="220"></canvas>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header bg-white fw-bold">Выручка по выданным заказам (₽)</div>
+            <div class="card-body">
+                <canvas id="revenueBarChart" height="220"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if current_user.role in ['admin', 'master'] %}
+<div class="row g-4 mb-4">
+    <div class="col-12">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white fw-bold">Топ-10 запчастей по остатку на складе (шт.)</div>
+            <div class="card-body">
+                <canvas id="topPartsChart" height="90"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="row g-4">
+    <!-- Последние заказы -->
+    <div class="col-md-{% if current_user.role == 'admin' %}7{% else %}12{% endif %}">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-bold">Последние заказы</span>
+                <a href="{{ url_for('orders_list') }}" class="btn btn-sm btn-outline-primary">Все заказы</a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-striped mb-0">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Устройство</th>
+                                <th>Клиент</th>
+                                <th>Статус</th>
+                                <th>Дата</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for o in recent_orders %}
+                            <tr>
+                                <td>#{{ o.id }}</td>
+                                <td>{{ o.device }}</td>
+                                <td>{{ o.client.full_name if o.client else '—' }}</td>
+                                <td>
+                                    {% if o.status == 'waiting' %}
+                                        <span class="badge bg-secondary">Ожидание</span>
+                                    {% elif o.status == 'in_work' %}
+                                        <span class="badge bg-warning text-dark">В работе</span>
+                                    {% elif o.status == 'ready' %}
+                                        <span class="badge bg-info text-dark">Готов</span>
+                                    {% elif o.status == 'issued' %}
+                                        <span class="badge bg-success">Выдан</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ o.created_at.strftime('%d.%m.%Y') if o.created_at else '' }}</td>
+                                <td class="text-end">
+                                    <a href="{{ url_for('orders_detail', order_id=o.id) }}" class="btn btn-sm btn-outline-secondary">Открыть</a>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="6" class="text-center text-muted py-3">Заказов пока нет</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Блок «Последние действия» (ActionLog, последние 10) для администратора -->
+    {% if current_user.role == 'admin' %}
+    <div class="col-md-5">
+        <div class="card shadow-sm">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <span class="fw-bold">Последние действия (ActionLog)</span>
+                <a href="{{ url_for('action_logs') }}" class="btn btn-sm btn-outline-secondary">Весь лог</a>
+            </div>
+            <ul class="list-group list-group-flush small">
+                {% for log in recent_logs %}
+                <li class="list-group-item d-flex justify-content-between align-items-start">
+                    <div>
+                        <strong>{{ log.username }}</strong>: {{ log.action }}
+                    </div>
+                    <span class="text-muted ms-2 text-nowrap">{{ log.created_at.strftime('%d.%m %H:%M') }}</span>
+                </li>
+                {% else %}
+                <li class="list-group-item text-muted">Записей пока нет</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Подключение Chart.js через CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+    const statusCounts = {{ status_counts | tojson }};
+    const monthLabels = {{ month_labels | tojson }};
+    const monthOrdersData = {{ month_orders_data | tojson }};
+    const monthRevenueData = {{ month_revenue_data | tojson }};
+
+    // 1. Круговая диаграмма по статусам заказов
+    new Chart(document.getElementById('statusPieChart'), {
+        type: 'pie',
+        data: {
+            labels: ['Ожидание', 'В работе', 'Готов', 'Выдан'],
+            datasets: [{
+                data: [
+                    statusCounts.waiting,
+                    statusCounts.in_work,
+                    statusCounts.ready,
+                    statusCounts.issued
+                ],
+                backgroundColor: ['#6c757d', '#ffc107', '#0dcaf0', '#198754']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'bottom' } }
+        }
+    });
+
+    // 2. Столбчатая диаграмма количества заказов по месяцам
+    new Chart(document.getElementById('ordersBarChart'), {
+        type: 'bar',
+        data: {
+            labels: monthLabels,
+            datasets: [{
+                label: 'Заказов (шт.)',
+                data: monthOrdersData,
+                backgroundColor: '#0d6efd'
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+        }
+    });
+
+    // 3. Столбчатая диаграмма выручки по выданным заказам
+    new Chart(document.getElementById('revenueBarChart'), {
+        type: 'bar',
+        data: {
+            labels: monthLabels,
+            datasets: [{
+                label: 'Выручка (₽)',
+                data: monthRevenueData,
+                backgroundColor: '#198754'
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+
+    {% if current_user.role in ['admin', 'master'] %}
+    // 4. Топ-10 запчастей по остатку
+    const topPartsLabels = {{ top_parts_labels | tojson }};
+    const topPartsQuantities = {{ top_parts_quantities | tojson }};
+    new Chart(document.getElementById('topPartsChart'), {
+        type: 'bar',
+        data: {
+            labels: topPartsLabels,
+            datasets: [{
+                label: 'Остаток на складе (шт.)',
+                data: topPartsQuantities,
+                backgroundColor: '#0dcaf0'
+            }]
+        },
+        options: {
+            responsive: true,
+            scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+        }
+    });
+    {% endif %}
+</script>
+{% endblock %}

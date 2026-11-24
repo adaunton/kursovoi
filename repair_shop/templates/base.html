@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}МастерСервис — Учёт заказов и склада{% endblock %}</title>
+    <!-- Bootstrap 5 CSS (CDN) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons (CDN) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <!-- Дополнительные стили -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Верхняя навигационная панель Bootstrap -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm mb-4">
+        <div class="container">
+            <a class="navbar-brand fw-bold" href="{{ url_for('dashboard') if current_user.is_authenticated else url_for('login') }}">
+                <i class="bi bi-tools me-2"></i>МастерСервис
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="mainNav">
+                {% if current_user.is_authenticated %}
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}" href="{{ url_for('dashboard') }}">
+                            Дашборд
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint and request.endpoint.startswith('orders_') %}active{% endif %}" href="{{ url_for('orders_list') }}">
+                            Заказы
+                        </a>
+                    </li>
+
+                    {% if current_user.role in ['admin', 'master'] %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint and request.endpoint.startswith('parts_') %}active{% endif %}" href="{{ url_for('parts_list') }}">
+                            Склад
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint and request.endpoint.startswith('suppliers_') %}active{% endif %}" href="{{ url_for('suppliers_list') }}">
+                            Поставщики
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint and request.endpoint.startswith('purchase_requests_') %}active{% endif %}" href="{{ url_for('purchase_requests_list') }}">
+                            Заявки
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    {% if current_user.role == 'admin' %}
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'users_list' %}active{% endif %}" href="{{ url_for('users_list') }}">
+                            Пользователи
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.endpoint == 'action_logs' %}active{% endif %}" href="{{ url_for('action_logs') }}">
+                            Лог
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+
+                <!-- Правая часть: имя пользователя, роль, ссылки Профиль и Выйти -->
+                <div class="d-flex align-items-center text-light gap-3">
+                    <span class="small">
+                        <i class="bi bi-person-circle me-1"></i>
+                        <strong>{{ current_user.full_name }}</strong>
+                        {% if current_user.role == 'admin' %}
+                            <span class="badge bg-danger ms-1">Админ</span>
+                        {% elif current_user.role == 'master' %}
+                            <span class="badge bg-warning text-dark ms-1">Мастер</span>
+                        {% else %}
+                            <span class="badge bg-secondary ms-1">Клиент</span>
+                        {% endif %}
+                    </span>
+                    <a href="{{ url_for('profile') }}" class="btn btn-outline-light btn-sm">Профиль</a>
+                    <a href="{{ url_for('logout') }}" class="btn btn-danger btn-sm">Выйти</a>
+                </div>
+                {% else %}
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('login') }}">Вход</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('register') }}">Регистрация</a>
+                    </li>
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- Основной контейнер страницы -->
+    <main class="container mb-5">
+        <!-- Вывод flash-уведомлений -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Подвал -->
+    <footer class="bg-white border-top py-3 mt-auto">
+        <div class="container text-center text-muted small">
+            Система управления заказами ремонтной мастерской и складом запчастей &copy; 2026 (Учебный курсовой проект на Flask)
+        </div>
+    </footer>
+
+    <!-- Bootstrap 5 JS Bundle (CDN) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

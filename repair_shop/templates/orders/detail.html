@@ -1,0 +1,210 @@
+{% extends "base.html" %}
+{% block title %}Заказ #{{ order.id }} — МастерСервис{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h2 class="mb-1">
+            Заказ #{{ order.id }}: {{ order.device }}
+            {% if order.status == 'waiting' %}
+                <span class="badge bg-secondary ms-2">Ожидание</span>
+            {% elif order.status == 'in_work' %}
+                <span class="badge bg-warning text-dark ms-2">В работе</span>
+            {% elif order.status == 'ready' %}
+                <span class="badge bg-info text-dark ms-2">Готов</span>
+            {% elif order.status == 'issued' %}
+                <span class="badge bg-success ms-2">Выдан</span>
+            {% endif %}
+
+            {% if order.priority == 'urgent' %}
+                <span class="badge bg-danger ms-1">Срочный</span>
+            {% else %}
+                <span class="badge bg-secondary ms-1">Обычный</span>
+            {% endif %}
+        </h2>
+        <div class="text-muted small">
+            Принят: {{ order.accepted_at.strftime('%d.%m.%Y %H:%M') if order.accepted_at else '—' }}
+            {% if order.issued_at %} | Выдан: {{ order.issued_at.strftime('%d.%m.%Y %H:%M') }}{% endif %}
+        </div>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('orders_list') }}" class="btn btn-outline-secondary">&larr; К списку заказов</a>
+        {% if current_user.role in ['admin', 'master'] %}
+        <a href="{{ url_for('orders_edit', order_id=order.id) }}" class="btn btn-outline-primary">Редактировать</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-4">
+    <!-- Левая колонка: информация о заказе и запчасти -->
+    <div class="col-md-7">
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-light fw-bold">Информация о заказе и устройстве</div>
+            <div class="card-body">
+                <dl class="row mb-0">
+                    <dt class="col-sm-4 text-muted">Клиент:</dt>
+                    <dd class="col-sm-8">{{ order.client.full_name }} ({{ order.client.phone }})</dd>
+
+                    <dt class="col-sm-4 text-muted">Назначенный мастер:</dt>
+                    <dd class="col-sm-8">{{ order.master.full_name if order.master else 'Ещё не назначен' }}</dd>
+
+                    <dt class="col-sm-4 text-muted">Устройство:</dt>
+                    <dd class="col-sm-8 fw-semibold">{{ order.device }}</dd>
+
+                    <dt class="col-sm-4 text-muted">Описание поломки:</dt>
+                    <dd class="col-sm-8">{{ order.description }}</dd>
+
+                    <dt class="col-sm-4 text-muted">Предварительная цена:</dt>
+                    <dd class="col-sm-8">{{ "%.2f"|format(order.cost_preliminary or 0) }} ₽</dd>
+
+                    <dt class="col-sm-4 text-muted">Итоговая стоимость:</dt>
+                    <dd class="col-sm-8 fw-bold text-success">{{ "%.2f"|format(order.cost_final or 0) }} ₽</dd>
+
+                    <dt class="col-sm-4 text-muted">Гарантия:</dt>
+                    <dd class="col-sm-8">{{ order.warranty_days }} дней</dd>
+                </dl>
+            </div>
+        </div>
+
+        <!-- Запчасти, используемые в заказе -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                <span class="fw-bold">Запчасти по заказу</span>
+                <span class="small text-muted">Сумма запчастей: <strong>{{ "%.2f"|format(order.parts_total_cost) }} ₽</strong></span>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-striped mb-0">
+                    <thead>
+                        <tr>
+                            <th>Артикул</th>
+                            <th>Наименование</th>
+                            <th>Кол-во</th>
+                            <th>Цена</th>
+                            <th>Статус списания</th>
+                            {% if current_user.role in ['admin', 'master'] %}
+                            <th class="text-end">Действие</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for op in order.order_parts %}
+                        <tr>
+                            <td><code>{{ op.part.article if op.part else '—' }}</code></td>
+                            <td>{{ op.part.name if op.part else 'Удалена' }}</td>
+                            <td>{{ op.quantity }} шт.</td>
+                            <td>{{ "%.2f"|format(op.part.price if op.part else 0) }} ₽</td>
+                            <td>
+                                {% if op.written_off %}
+                                    <span class="badge bg-success">Списано со склада</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">В резерве (до статуса «Готов»)</span>
+                                {% endif %}
+                            </td>
+                            {% if current_user.role in ['admin', 'master'] %}
+                            <td class="text-end">
+                                {% if not op.written_off %}
+                                <form method="POST" action="{{ url_for('orders_remove_part', order_id=order.id, op_id=op.id) }}" class="d-inline">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger">Убрать</button>
+                                </form>
+                                {% endif %}
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="6" class="text-center text-muted py-3">Запчасти к заказу не привязаны</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            {% if current_user.role in ['admin', 'master'] %}
+            <div class="card-footer bg-white">
+                <form method="POST" action="{{ url_for('orders_add_part', order_id=order.id) }}" class="row g-2 align-items-end">
+                    {{ add_part_form.hidden_tag() }}
+                    <div class="col-md-7">
+                        <label class="form-label small text-muted mb-1">Привязать запчасть со склада</label>
+                        {{ add_part_form.part_id(class="form-select form-select-sm") }}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label small text-muted mb-1">Кол-во</label>
+                        {{ add_part_form.quantity(class="form-control form-control-sm") }}
+                    </div>
+                    <div class="col-md-3 d-grid">
+                        {{ add_part_form.submit(class="btn btn-sm btn-primary") }}
+                    </div>
+                </form>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Правая колонка: смена статуса (master/admin) и комментарии -->
+    <div class="col-md-5">
+        {% if current_user.role in ['admin', 'master'] %}
+        <div class="card shadow-sm mb-4 border-primary">
+            <div class="card-header bg-primary text-white fw-bold">
+                Управление статусом заказа
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('orders_change_status', order_id=order.id) }}">
+                    {{ status_form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ status_form.status.label(class="form-label") }}
+                        {{ status_form.status(class="form-select") }}
+                        <div class="form-text">
+                            При переводе в статус <strong>«Готов» (ready)</strong> система проверит остатки и автоматически спишет привязанные запчасти со склада.
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ status_form.cost_final.label(class="form-label") }}
+                            {{ status_form.cost_final(class="form-control") }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ status_form.warranty_days.label(class="form-label") }}
+                            {{ status_form.warranty_days(class="form-control") }}
+                        </div>
+                    </div>
+                    <div class="d-grid">
+                        {{ status_form.submit(class="btn btn-primary") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- История работ и комментарии (OrderComment) -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-light fw-bold">
+                История работ и комментарии ({{ order.comments|length }})
+            </div>
+            <div class="card-body">
+                {% for c in order.comments %}
+                <div class="border rounded p-2 mb-2 bg-light">
+                    <div class="d-flex justify-content-between small text-muted mb-1">
+                        <strong>{{ c.user.full_name if c.user else 'Пользователь' }} ({{ c.user.role if c.user else '' }})</strong>
+                        <span>{{ c.created_at.strftime('%d.%m.%Y %H:%M') }}</span>
+                    </div>
+                    <div>{{ c.text }}</div>
+                </div>
+                {% else %}
+                <p class="text-muted small mb-3">Комментариев по заказу пока нет.</p>
+                {% endfor %}
+
+                <form method="POST" action="{{ url_for('orders_add_comment', order_id=order.id) }}" class="mt-3">
+                    {{ comment_form.hidden_tag() }}
+                    <div class="mb-2">
+                        {{ comment_form.text(class="form-control form-control-sm", rows=3, placeholder="Напишите комментарий или отчёт о выполненных работах...") }}
+                    </div>
+                    <div class="d-grid">
+                        {{ comment_form.submit(class="btn btn-sm btn-dark") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

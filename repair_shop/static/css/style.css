@@ -1,0 +1,16 @@
+/* Стили учебного проекта МастерСервис (static/css/style.css) */
+body {
+    background-color: #f8f9fa;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+main {
+    flex: 1;
+}
+
+.table td,
+.table th {
+    vertical-align: middle;
+}

@@ -1,0 +1,194 @@
+{% extends "base.html" %}
+{% block title %}Заказы на ремонт — МастерСервис{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2 class="mb-0">
+        {% if current_user.role == 'client' %}Мои заказы{% else %}Все заказы на ремонт{% endif %}
+    </h2>
+    <div class="d-flex gap-2">
+        {% if current_user.role == 'admin' %}
+        <a href="{{ url_for('orders_export', status=request.args.get('status', ''), priority=request.args.get('priority', ''), search=request.args.get('search', ''), date_from=request.args.get('date_from', ''), date_to=request.args.get('date_to', '')) }}" class="btn btn-outline-success">
+            <i class="bi bi-file-earmark-spreadsheet me-1"></i>Экспорт в CSV
+        </a>
+        {% endif %}
+        <a href="{{ url_for('orders_create') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Создать заказ
+        </a>
+    </div>
+</div>
+
+<!-- Форма поиска и фильтрации (GET) -->
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <form method="GET" action="{{ url_for('orders_list') }}" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label small text-muted">Поиск (устройство, описание, ФИО)</label>
+                <input type="text" name="search" class="form-control form-control-sm" value="{{ request.args.get('search', '') }}" placeholder="Например: iPhone 13 или Сидоров">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted">Статус</label>
+                <select name="status" class="form-select form-select-sm">
+                    <option value="">Все статусы</option>
+                    <option value="waiting" {% if request.args.get('status') == 'waiting' %}selected{% endif %}>Ожидание</option>
+                    <option value="in_work" {% if request.args.get('status') == 'in_work' %}selected{% endif %}>В работе</option>
+                    <option value="ready" {% if request.args.get('status') == 'ready' %}selected{% endif %}>Готов</option>
+                    <option value="issued" {% if request.args.get('status') == 'issued' %}selected{% endif %}>Выдан</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted">Приоритет</label>
+                <select name="priority" class="form-select form-select-sm">
+                    <option value="">Любой</option>
+                    <option value="normal" {% if request.args.get('priority') == 'normal' %}selected{% endif %}>Обычный</option>
+                    <option value="urgent" {% if request.args.get('priority') == 'urgent' %}selected{% endif %}>Срочный</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted">Дата приёма (с)</label>
+                <input type="date" name="date_from" class="form-control form-control-sm" value="{{ request.args.get('date_from', '') }}">
+            </div>
+            <div class="col-md-2">
+                <label class="form-label small text-muted">Дата приёма (по)</label>
+                <input type="date" name="date_to" class="form-control form-control-sm" value="{{ request.args.get('date_to', '') }}">
+            </div>
+            <div class="col-md-1 d-grid">
+                <button type="submit" class="btn btn-sm btn-dark">Найти</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Таблица заказов -->
+<div class="card shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-striped mb-0">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Устройство</th>
+                        <th>Клиент</th>
+                        <th>Мастер</th>
+                        <th>Приоритет</th>
+                        <th>Статус</th>
+                        <th>Стоимость</th>
+                        <th>Гарантия</th>
+                        <th>Принят</th>
+                        <th class="text-end">Действия</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for o in orders %}
+                    <tr>
+                        <td><strong>#{{ o.id }}</strong></td>
+                        <td>
+                            <div class="fw-semibold">{{ o.device }}</div>
+                            <small class="text-muted">{{ o.description[:60] }}{% if o.description|length > 60 %}...{% endif %}</small>
+                        </td>
+                        <td>
+                            {{ o.client.full_name if o.client else '—' }}<br>
+                            <small class="text-muted">{{ o.client.phone if o.client else '' }}</small>
+                        </td>
+                        <td>{{ o.master.full_name if o.master else 'Не назначен' }}</td>
+                        <td>
+                            {% if o.priority == 'urgent' %}
+                                <span class="badge bg-danger">Срочный</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Обычный</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if o.status == 'waiting' %}
+                                <span class="badge bg-secondary">Ожидание</span>
+                            {% elif o.status == 'in_work' %}
+                                <span class="badge bg-warning text-dark">В работе</span>
+                            {% elif o.status == 'ready' %}
+                                <span class="badge bg-info text-dark">Готов</span>
+                            {% elif o.status == 'issued' %}
+                                <span class="badge bg-success">Выдан</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if o.cost_final and o.cost_final > 0 %}
+                                <strong>{{ "%.2f"|format(o.cost_final) }} ₽</strong>
+                            {% else %}
+                                <span class="text-muted">предв. {{ "%.2f"|format(o.cost_preliminary or 0) }} ₽</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ o.warranty_days }} дн.</td>
+                        <td>{{ o.accepted_at.strftime('%d.%m.%Y') if o.accepted_at else '—' }}</td>
+                        <td class="text-end text-nowrap">
+                            <a href="{{ url_for('orders_detail', order_id=o.id) }}" class="btn btn-sm btn-outline-primary">Детали</a>
+                            {% if current_user.role in ['admin', 'master'] %}
+                            <a href="{{ url_for('orders_edit', order_id=o.id) }}" class="btn btn-sm btn-outline-secondary">Изменить</a>
+                            {% endif %}
+                            {% if current_user.role == 'admin' %}
+                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteOrderModal{{ o.id }}">
+                                Удалить
+                            </button>
+                            {% endif %}
+                        </td>
+                    </tr>
+
+                    {% if current_user.role == 'admin' %}
+                    <!-- Модальное окно подтверждения удаления заказа -->
+                    <div class="modal fade" id="deleteOrderModal{{ o.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">Подтверждение удаления</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+                                </div>
+                                <div class="modal-body">
+                                    Вы уверены, что хотите удалить заказ <strong>#{{ o.id }} ({{ o.device }})</strong>?
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                                    <form method="POST" action="{{ url_for('orders_delete', order_id=o.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button type="submit" class="btn btn-danger">Удалить</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+                    {% else %}
+                    <tr>
+                        <td colspan="10" class="text-center text-muted py-4">По вашему запросу заказов не найдено.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Пагинация Bootstrap с сохранением фильтров -->
+{% if pagination.pages > 1 %}
+<nav class="mt-4">
+    <ul class="pagination justify-content-center">
+        <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('orders_list', page=pagination.prev_num, status=request.args.get('status'), priority=request.args.get('priority'), search=request.args.get('search'), date_from=request.args.get('date_from'), date_to=request.args.get('date_to')) }}">
+                &larr; Назад
+            </a>
+        </li>
+        {% for p in pagination.iter_pages(left_edge=1, left_current=2, right_current=2, right_edge=1) %}
+            {% if p %}
+                <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                    <a class="page-link" href="{{ url_for('orders_list', page=p, status=request.args.get('status'), priority=request.args.get('priority'), search=request.args.get('search'), date_from=request.args.get('date_from'), date_to=request.args.get('date_to')) }}">{{ p }}</a>
+                </li>
+            {% else %}
+                <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+            {% endif %}
+        {% endfor %}
+        <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+            <a class="page-link" href="{{ url_for('orders_list', page=pagination.next_num, status=request.args.get('status'), priority=request.args.get('priority'), search=request.args.get('search'), date_from=request.args.get('date_from'), date_to=request.args.get('date_to')) }}">
+                Вперёд &rarr;
+            </a>
+        </li>
+    </ul>
+</nav>
+{% endif %}
+{% endblock %}

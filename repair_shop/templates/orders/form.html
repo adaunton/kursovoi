@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}{% if is_edit %}Редактирование заказа #{{ order.id }}{% else %}Создание нового заказа{% endif %} — МастерСервис{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-dark text-white">
+                <h5 class="mb-0">
+                    {% if is_edit %}Редактирование заказа #{{ order.id }}{% else %}Оформление нового заказа на ремонт{% endif %}
+                </h5>
+            </div>
+            <div class="card-body p-4">
+                <form method="POST" novalidate>
+                    {{ form.hidden_tag() }}
+
+                    {% if current_user.role in ['admin', 'master'] and not is_edit %}
+                    <div class="mb-3">
+                        {{ form.client_id.label(class="form-label") }}
+                        {{ form.client_id(class="form-select") }}
+                    </div>
+                    {% endif %}
+
+                    {% if is_edit and current_user.role == 'admin' %}
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.client_id.label(class="form-label") }}
+                            {{ form.client_id(class="form-select") }}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ form.master_id.label(class="form-label") }}
+                            {{ form.master_id(class="form-select") }}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        {{ form.device.label(class="form-label") }}
+                        {{ form.device(class="form-control" + (" is-invalid" if form.device.errors else ""), readonly=(is_edit and current_user.role == 'master'), placeholder="Например: Смартфон Apple iPhone 13 128GB") }}
+                        {% for err in form.device.errors %}
+                            <div class="invalid-feedback">{{ err }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        {{ form.description.label(class="form-label") }}
+                        {{ form.description(class="form-control" + (" is-invalid" if form.description.errors else ""), rows=4, readonly=(is_edit and current_user.role == 'master'), placeholder="Подробно опишите симптомы неисправности...") }}
+                        {% for err in form.description.errors %}
+                            <div class="invalid-feedback">{{ err }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ form.priority.label(class="form-label") }}
+                            {{ form.priority(class="form-select") }}
+                        </div>
+
+                        {% if is_edit %}
+                        <div class="col-md-6 mb-3">
+                            {{ form.status.label(class="form-label") }}
+                            {{ form.status(class="form-select") }}
+                            <div class="form-text">При выборе статуса «Готов» автоматически спишутся запчасти со склада.</div>
+                        </div>
+                        {% elif current_user.role in ['admin', 'master'] %}
+                        <div class="col-md-6 mb-3">
+                            {{ form.cost_preliminary.label(class="form-label") }}
+                            {{ form.cost_preliminary(class="form-control" + (" is-invalid" if form.cost_preliminary.errors else "")) }}
+                            {% for err in form.cost_preliminary.errors %}
+                                <div class="invalid-feedback">{{ err }}</div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    {% if is_edit %}
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            {{ form.cost_preliminary.label(class="form-label") }}
+                            {{ form.cost_preliminary(class="form-control" + (" is-invalid" if form.cost_preliminary.errors else "")) }}
+                            {% for err in form.cost_preliminary.errors %}
+                                <div class="invalid-feedback">{{ err }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            {{ form.cost_final.label(class="form-label") }}
+                            {{ form.cost_final(class="form-control" + (" is-invalid" if form.cost_final.errors else "")) }}
+                            {% for err in form.cost_final.errors %}
+                                <div class="invalid-feedback">{{ err }}</div>
+                            {% endfor %}
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            {{ form.warranty_days.label(class="form-label") }}
+                            {{ form.warranty_days(class="form-control" + (" is-invalid" if form.warranty_days.errors else "")) }}
+                            {% for err in form.warranty_days.errors %}
+                                <div class="invalid-feedback">{{ err }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
+
+                    <div class="d-flex justify-content-between mt-3">
+                        <a href="{{ url_for('orders_list') }}" class="btn btn-outline-secondary">Отмена</a>
+                        {{ form.submit(class="btn btn-primary") }}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
